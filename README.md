@@ -1,7 +1,7 @@
 # Regression-Model-for-Corn-Yield-prediction
 Final Report for Stat 615
 
-Group Members: John Li, Yaopeng Ma, Changhe Ji
+Group Members: John Zhang, Yaopeng Ma, Changhe Ji
 
 Corn yield prediction is essential for decision-makers, and it is complex because so many potential explanatory variables may affect the growth of crops. Regressors represent four different aspects: weather (varies weekly), soil, scale, and growth performance (varies weekly), and the response is corn yield in BU/Acre. Data was collected from 1990 to 2018, with a total of 8,352 observations and 688 features. The goal is to forecast corn yield performance for the Corn Belt states Illinois, Iowa, and Indiana. 
 
