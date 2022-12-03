@@ -1,0 +1,61 @@
+---
+title: "615_Corn_Project"
+author: "John"
+date: "2022-11-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+average of soil at different spatial resolutions at a county to compute county-level soil information
+
+median of weather at different spatial resolutions at a county to scale up the county-level weather information
+
+weekly data
+
+Our model selected 202 robust features and 11 two-way interactions to predict the corn yield. Out of the 202 features, 155 were for weather, 37 for soil, and 10 for management.
+
+```{r}
+library(tidyverse)
+
+YIELD_CORN <- read.csv("Data Set/YIELD_CORN.csv")
+WEATHER_CORN_part1 <- read.csv("Data Set/WEATHER_CORN_part1.csv")
+WEATHER_CORN_part2 <- read.csv("Data Set/WEATHER_CORN_part2.csv")
+SOIL_CORN <- read.csv("Data Set/SOIL_CORN.csv")
+PROGRESS_CORN <- read.csv("Data Set/PROGRESS_CORN.csv")
+POPULATION_CORN <- read.csv("Data Set/POPULATION_CORN.csv")
+HARVESTED_CORN <- read.csv("Data Set/HARVESTED_CORN.csv")
+FLOWER_CORN <- read.csv("Data Set/FLOWER_CORN.csv")
+ACRESPLANTED_CORN <- read.csv("Data Set/ACRESPLANTED_CORN.csv")
+
+WEATHER_CORN <- unique(rbind(WEATHER_CORN_part1,WEATHER_CORN_part2))
+
+datalist <- list(YIELD_CORN,SOIL_CORN,PROGRESS_CORN,POPULATION_CORN,HARVESTED_CORN,
+                 FLOWER_CORN,ACRESPLANTED_CORN,WEATHER_CORN)
+
+ly <- length(colnames(YIELD_CORN))
+ly1 <- colnames(YIELD_CORN)[1:ly-1]
+
+
+#merge all data frames together
+T1 <- datalist %>% reduce(full_join, by=ly1)
+
+T2 <- filter(T1, Year %in% c(2015, 2016,2017,2018))
+
+write.csv(T2, file = "221014_Corn_Data.csv")
+
+
+
+
+```
+
+

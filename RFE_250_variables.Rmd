@@ -1,0 +1,652 @@
+---
+title: "RFE_250_variables"
+author: "ChangheJi_S01435728"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+```{r data_preprocessing}
+#load_data
+data_origin = read.csv("/Users/akaike/Documents/fall22/STAT615/final pj/corn_data.csv", header = TRUE)
+data_normalized = read.csv("/Users/akaike/Documents/fall22/STAT615/final pj/corn_data_normalized.csv", header = TRUE)
+
+data_normalized = data_normalized[,c(2:690)]
+Y = data_normalized$Value
+X = as.matrix(data_normalized[,c(2:689)])
+
+Y_train = Y[587:8352]
+X_train = X[587:8352,]
+```
+
+
+```{r}
+rbf_variables = read.table("/Users/akaike/Documents/fall22/STAT615/final pj/rbf_variable_250.txt",header = FALSE)
+length(rbf_variables$V1)
+model_rbf = lm(Value ~. , data = data_normalized[587:8352,c("Value",rbf_variables$V1)])
+```
+  
+```{r}
+summary(model_rbf)
+library("car")
+qqPlot(resid(model_rbf))
+rbf_RMSE = sqrt(sum(resid(model_rbf)^2)/length(resid(model_rbf)))
+rbf_RRMSE = rbf_RMSE/mean(Y_train)
+```
+
+\section{2017 prediction 250 variables}
+```{r}
+data_normalized2 = cbind(data_origin[,c(1:8)],data_normalized)
+data_2017 = data_normalized2[data_normalized2$Year==2017,]
+```
+\subsection{2017 Illinois 250 variables}
+```{r warning=FALSE}
+#2017_predictions_Illinois_250 variables
+predictions_ILLINOIS_2017 = matrix(0,27,40)
+Illinois_2017 = data_2017[data_2017$State=="ILLINOIS",]
+data_Illinois = data_normalized2[data_normalized2$State == "ILLINOIS",]
+week = 0
+for (i in 13:52) {
+  year = 1
+  for (j in 1990:2016) {
+    data_county = data_Illinois[data_Illinois$Year == 2019,]
+    for (county in Illinois_2017$County) {
+      temp_data = data_Illinois[data_Illinois$Year == j,]
+      if (county %in% temp_data$County) {
+        if (week == 0) {
+          a = cbind(Illinois_2017[Illinois_2017$County == county,c(1:99,100)],
+          temp_data[temp_data$County == county,c((100+week+1):151)],
+          Illinois_2017[Illinois_2017$County == county,c(152,153:(153+week))],
+          temp_data[temp_data$County == county,c((153+week+1):203)],
+          Illinois_2017[Illinois_2017$County == county,c(204:205+week)],
+          temp_data[temp_data$County == county,c((205+week+1):256)],
+          Illinois_2017[Illinois_2017$County == county,c(257,258:(258+(week+1)*11 - 1))],
+          temp_data[temp_data$County == county,c((258+(week+1)*11):697)])
+        } else if (week == 39) {
+          a = Illinois_2017[Illinois_2017$County == county,]
+        } else {
+                  a = cbind(Illinois_2017[Illinois_2017$County == county,c(1:99,100:(100+week))],
+                  temp_data[temp_data$County == county,c((100+week+1):151)],
+                  Illinois_2017[Illinois_2017$County == county,c(152,153:(153+week))],
+                  temp_data[temp_data$County == county,c((153+week+1):204)],
+                  Illinois_2017[Illinois_2017$County == county,c(205:(205+week))], 
+                  temp_data[temp_data$County == county,c((205+week+1):256)],
+                  Illinois_2017[Illinois_2017$County == county,c(257,258:(258+(week+1)*11 - 1))],
+                  temp_data[temp_data$County == county,c((258+(week+1)*11):697)])
+        }
+        
+#        data_county[c, c(1:99,100:(100+week))] = Illinois_2017[Illinois_2017$County == county,c(1:99,100:(100+week))]
+#        data_county[c, c((100+week+1):151)] = temp_data[temp_data$County == county,c((100+week+1):151)]
+#        data_county[c, c(152,153:(153+week))] = Illinois_2017[Illinois_2017$County == county,c(152,153:(153+week))]
+#        data_county[c, c((153+week+1):204)] = temp_data[temp_data$County == county,c((153+week+1):204)]
+#        data_county[c, c(205:(205+week))] = Illinois_2017[Illinois_2017$County == county,c(205:(205+week))]
+#        data_county[c, c((205+week+1):256)] = temp_data[temp_data$County == county,c((205+week+1):256)]
+#       data_county[c, c(257,258:(258+(week+1)*11 - 1))] = Illinois_2017[Illinois_2017$County == county,c(257,258:(258+(week+1)*11 - 1))]
+#        data_county[c, c((258+(week+1)*11):697)] = temp_data[Illinois_2017$County == county,c((258+(week+1)*11):697)]
+      } else {
+        a = Illinois_2017[Illinois_2017$County == county,]
+      }
+      data_county = rbind(data_county,a)
+    }
+    yhat0 <- predict(model_rbf, newdata=  data_county[,c(rbf_variables$V1)])
+    predictions_ILLINOIS_2017[year,week + 1] = sum(yhat0)/length(yhat0)
+    year = year + 1
+  }
+  week = week + 1
+}
+
+acre_value = sum(Illinois_2017$Acre.Value)
+real_Yield = matrix(0,40,2)
+max_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  max_value = max(predictions_ILLINOIS_2017[,i])
+  max_predicts[i,1] = max_value
+  max_predicts[i,2] = i
+  real_Yield[i,1] = sum(Illinois_2017$Value)/length(yhat0)
+  real_Yield[i,2] = i
+}
+
+min_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  min_value = min(predictions_ILLINOIS_2017[,i])
+  min_predicts[i,1] = min_value
+  min_predicts[i,2] = i
+}
+
+median_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  min_value = median(predictions_ILLINOIS_2017[,i])
+  median_predicts[i,1] = min_value
+  median_predicts[i,2] = i
+}
+
+
+plot(x = max_predicts[,2], y = max_predicts[,1],ylim = c(0,300),lty =2,col='red',type= 'l', ylab = "Yield",xlab = "week", main = "ILLINOIS 2017")
+lines(x = min_predicts[,2],y=min_predicts[,1],lty =2,col='red')
+lines(x = median_predicts[,2], y = median_predicts[,1], lty =1, col='red')
+lines(x = real_Yield[,2], y = real_Yield[,1], lty =1, col='blue')
+```
+
+```{r warning=FALSE}
+yhat_Illinois_2017_RFE250 = predict(model_rbf, newdata = Illinois_2017[,c(rbf_variables$V1)])
+res = Illinois_2017$Value - yhat_Illinois_2017_RFE250
+
+Illinois_2017_RFE250_RMSE = sqrt(sum(res^2)/length(res))
+Illinois_2017_RFE250_RRMSE = Illinois_2017_RFE250_RMSE/mean(Illinois_2017$Value)
+print(c(Illinois_2017_RFE250_RMSE,Illinois_2017_RFE250_RRMSE))
+
+RRMSE_for_county_Illinois_2017_RFE250 = sqrt(res^2)/Illinois_2017$Value
+write.table(RRMSE_for_county_Illinois_2017_RFE250, "/Users/akaike/Documents/fall22/STAT615/final pj/RRMSE_RBF250_ALLDATA/RRMSE_for_county_Illinois_2017_RFE250.txt", append = FALSE, sep = " ", dec = ".",
+            row.names = TRUE, col.names = TRUE)
+```
+
+\subsection{2017 IOWA 250 variables}
+```{r warning=FALSE}
+#2017_predictions_IOWA_250 variables
+predictions_IOWA_2017 = matrix(0,27,40)
+IOWA_2017 = data_2017[data_2017$State=="IOWA",]
+data_IOWA = data_normalized2[data_normalized2$State == "IOWA",]
+week = 0
+for (i in 13:52) {
+  year = 1
+  for (j in 1990:2016) {
+    data_county = data_IOWA[data_IOWA$Year == 2019,]
+    for (county in IOWA_2017$County) {
+      temp_data = data_IOWA[data_IOWA$Year == j,]
+      if (county %in% temp_data$County) {
+        if (week == 0) {
+          a = cbind(IOWA_2017[IOWA_2017$County == county,c(1:99,100)],
+          temp_data[temp_data$County == county,c((100+week+1):151)],
+          IOWA_2017[IOWA_2017$County == county,c(152,153:(153+week))],
+          temp_data[temp_data$County == county,c((153+week+1):203)],
+          IOWA_2017[IOWA_2017$County == county,c(204:205+week)],
+          temp_data[temp_data$County == county,c((205+week+1):256)],
+          IOWA_2017[IOWA_2017$County == county,c(257,258:(258+(week+1)*11 - 1))],
+          temp_data[temp_data$County == county,c((258+(week+1)*11):697)])
+        } else if (week == 39) {
+          a = IOWA_2017[IOWA_2017$County == county,]
+        } else {
+                  a = cbind(IOWA_2017[IOWA_2017$County == county,c(1:99,100:(100+week))],
+                  temp_data[temp_data$County == county,c((100+week+1):151)],
+                  IOWA_2017[IOWA_2017$County == county,c(152,153:(153+week))],
+                  temp_data[temp_data$County == county,c((153+week+1):204)],
+                  IOWA_2017[IOWA_2017$County == county,c(205:(205+week))], 
+                  temp_data[temp_data$County == county,c((205+week+1):256)],
+                  IOWA_2017[IOWA_2017$County == county,c(257,258:(258+(week+1)*11 - 1))],
+                  temp_data[temp_data$County == county,c((258+(week+1)*11):697)])
+        }
+      } else {
+        a = IOWA_2017[IOWA_2017$County == county,]
+      }
+      data_county = rbind(data_county,a)
+    }
+    yhat0 <- predict(model_rbf, newdata=  data_county[,c(rbf_variables$V1)])
+    predictions_IOWA_2017[year,week + 1] = sum(yhat0)/length(yhat0)
+    year = year + 1
+  }
+  week = week + 1
+}
+```
+
+```{r}
+acre_value = sum(IOWA_2017$Acre.Value)
+real_Yield = matrix(0,40,2)
+max_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  max_value = max(predictions_IOWA_2017[,i])
+  max_predicts[i,1] = max_value
+  max_predicts[i,2] = i
+  real_Yield[i,1] = sum(IOWA_2017$Value)/length(yhat0)
+  real_Yield[i,2] = i
+}
+
+min_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  min_value = min(predictions_IOWA_2017[,i])
+  min_predicts[i,1] = min_value
+  min_predicts[i,2] = i
+}
+
+median_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  min_value = median(predictions_IOWA_2017[,i])
+  median_predicts[i,1] = min_value
+  median_predicts[i,2] = i
+}
+
+```
+
+```{r}
+plot(x = max_predicts[,2], y = max_predicts[,1],ylim = c(0,300),lty =2,col='red',type= 'l', ylab = "Yield",xlab = "week", main = "IOWA 2017")
+lines(x = min_predicts[,2],y=min_predicts[,1],lty =2,col='red')
+lines(x = median_predicts[,2], y = median_predicts[,1], lty =1, col='red')
+lines(x = real_Yield[,2], y = real_Yield[,1], lty =1, col='blue')
+```
+
+```{r warning=FALSE}
+yhat_IOWA_2017_RFE250 = predict(model_rbf, newdata=  IOWA_2017[,c(rbf_variables$V1)])
+res = IOWA_2017$Value - yhat_IOWA_2017_RFE250
+
+IOWA_2017_RFE250_RMSE = sqrt(sum(res^2)/length(res))
+IOWA_2017_RFE250_RRMSE = IOWA_2017_RFE250_RMSE/mean(IOWA_2017$Value)
+print(c(IOWA_2017_RFE250_RMSE,IOWA_2017_RFE250_RRMSE))
+
+RRMSE_for_county_IOWA_2017_RFE250 = sqrt(res^2)/IOWA_2017$Value
+
+write.table(RRMSE_for_county_IOWA_2017_RFE250, "/Users/akaike/Documents/fall22/STAT615/final pj/RRMSE_RBF250_ALLDATA/RRMSE_for_county_IOWA_2017_RFE250.txt", append = FALSE, sep = " ", dec = ".",
+            row.names = TRUE, col.names = TRUE)
+```
+
+
+\subsection{2017 INDIANA 250 variables}
+```{r warning=FALSE}
+#2017_predictions_INDIANA_250 variables
+predictions_INDIANA_2017 = matrix(0,27,40)
+INDIANA_2017 = data_2017[data_2017$State=="INDIANA",]
+data_INDIANA = data_normalized2[data_normalized2$State == "INDIANA",]
+week = 0
+for (i in 13:52) {
+  year = 1
+  for (j in 1990:2016) {
+    data_county = data_INDIANA[data_INDIANA$Year == 2019,]
+    for (county in INDIANA_2017$County) {
+      temp_data = data_INDIANA[data_INDIANA$Year == j,]
+      if (county %in% temp_data$County) {
+        if (week == 0) {
+          a = cbind(INDIANA_2017[INDIANA_2017$County == county,c(1:99,100)],
+          temp_data[temp_data$County == county,c((100+week+1):151)],
+          INDIANA_2017[INDIANA_2017$County == county,c(152,153:(153+week))],
+          temp_data[temp_data$County == county,c((153+week+1):203)],
+          INDIANA_2017[INDIANA_2017$County == county,c(204:205+week)],
+          temp_data[temp_data$County == county,c((205+week+1):256)],
+          INDIANA_2017[INDIANA_2017$County == county,c(257,258:(258+(week+1)*11 - 1))],
+          temp_data[temp_data$County == county,c((258+(week+1)*11):697)])
+        } else if (week == 39) {
+          a = INDIANA_2017[INDIANA_2017$County == county,]
+        } else {
+                  a = cbind(INDIANA_2017[INDIANA_2017$County == county,c(1:99,100:(100+week))],
+                  temp_data[temp_data$County == county,c((100+week+1):151)],
+                  INDIANA_2017[INDIANA_2017$County == county,c(152,153:(153+week))],
+                  temp_data[temp_data$County == county,c((153+week+1):204)],
+                  INDIANA_2017[INDIANA_2017$County == county,c(205:(205+week))], 
+                  temp_data[temp_data$County == county,c((205+week+1):256)],
+                  INDIANA_2017[INDIANA_2017$County == county,c(257,258:(258+(week+1)*11 - 1))],
+                  temp_data[temp_data$County == county,c((258+(week+1)*11):697)])
+        }
+        
+      } else {
+        a = INDIANA_2017[INDIANA_2017$County == county,]
+      }
+      data_county = rbind(data_county,a)
+    }
+    yhat0 <- predict(model_rbf, newdata=  data_county[,c(rbf_variables$V1)])
+    predictions_INDIANA_2017[year,week + 1] = sum(yhat0)/length(yhat0)
+    year = year + 1
+  }
+  week = week + 1
+}
+```
+
+```{r}
+acre_value = sum(INDIANA_2017$Acre.Value)
+real_Yield = matrix(0,40,2)
+max_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  max_value = max(predictions_INDIANA_2017[,i])
+  max_predicts[i,1] = max_value
+  max_predicts[i,2] = i
+  real_Yield[i,1] = sum(INDIANA_2017$Value)/length(yhat0)
+  real_Yield[i,2] = i
+}
+
+min_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  min_value = min(predictions_INDIANA_2017[,i])
+  min_predicts[i,1] = min_value
+  min_predicts[i,2] = i
+}
+
+median_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  min_value = median(predictions_INDIANA_2017[,i])
+  median_predicts[i,1] = min_value
+  median_predicts[i,2] = i
+}
+```
+
+```{r}
+plot(x = max_predicts[,2], y = max_predicts[,1],ylim = c(0,300),lty =2,col='red',type= 'l', ylab = "Yield",xlab = "week", main = "INDIANA 2017")
+lines(x = min_predicts[,2],y=min_predicts[,1],lty =2,col='red')
+lines(x = median_predicts[,2], y = median_predicts[,1], lty =1, col='red')
+lines(x = real_Yield[,2], y = real_Yield[,1], lty =1, col='blue')
+```
+
+```{r warning=FALSE}
+yhat_INDIANA_2017_RFE250 = predict(model_rbf, newdata=  INDIANA_2017[,c(rbf_variables$V1)])
+res = INDIANA_2017$Value - yhat_INDIANA_2017_RFE250
+
+INDIANA_2017_RFE250_RMSE = sqrt(sum(res^2)/length(res))
+INDIANA_2017_RFE250_RRMSE = INDIANA_2017_RFE250_RMSE/mean(INDIANA_2017$Value)
+print(c(INDIANA_2017_RFE250_RMSE,INDIANA_2017_RFE250_RRMSE))
+
+RRMSE_for_county_INDIANA_2017_RFE250 = sqrt(res^2)/INDIANA_2017$Value
+write.table(RRMSE_for_county_INDIANA_2017_RFE250, "/Users/akaike/Documents/fall22/STAT615/final pj/RRMSE_RBF250_ALLDATA/RRMSE_for_county_INDIANA_2017_RFE250.txt", append = FALSE, sep = " ", dec = ".",
+            row.names = TRUE, col.names = TRUE)
+```
+
+\section{2018 predictions}
+```{r}
+data_2018 = data_normalized2[data_normalized2$Year==2018,]
+```
+
+```{r}
+model_rbf = lm(Value ~. , data = data_normalized[294:8352,c("Value",rbf_variables$V1)])
+```
+
+```{r}
+summary(model_rbf)
+
+qqPlot(resid(model_rbf))
+rbf_RMSE = sqrt(sum(resid(model_rbf)^2)/length(resid(model_rbf)))
+rbf_RRMSE = rbf_RMSE/mean(Y_train)
+```
+
+\subsection{2018 Illinois RFE 250 variables}
+```{r warning=FALSE}
+#2018_predictions_Illinois_RFE 250 variables
+predictions_ILLINOIS_2018 = matrix(0,28,40)
+Illinois_2018 = data_2018[data_2018$State=="ILLINOIS",]
+data_Illinois = data_normalized2[data_normalized2$State == "ILLINOIS",]
+week = 0
+for (i in 13:52) {
+  year = 1
+  for (j in 1990:2017) {
+    data_county = data_Illinois[data_Illinois$Year == 2019,]
+    for (county in Illinois_2018$County) {
+      temp_data = data_Illinois[data_Illinois$Year == j,]
+      if (county %in% temp_data$County) {
+        if (week == 0) {
+          a = cbind(Illinois_2018[Illinois_2018$County == county,c(1:99,100)],
+          temp_data[temp_data$County == county,c((100+week+1):151)],
+          Illinois_2018[Illinois_2018$County == county,c(152,153:(153+week))],
+          temp_data[temp_data$County == county,c((153+week+1):203)],
+          Illinois_2018[Illinois_2018$County == county,c(204:205+week)],
+          temp_data[temp_data$County == county,c((205+week+1):256)],
+          Illinois_2018[Illinois_2018$County == county,c(257,258:(258+(week+1)*11 - 1))],
+          temp_data[temp_data$County == county,c((258+(week+1)*11):697)])
+        } else if (week == 39) {
+          a = Illinois_2018[Illinois_2018$County == county,]
+        } else {
+                  a = cbind(Illinois_2018[Illinois_2018$County == county,c(1:99,100:(100+week))],
+                  temp_data[temp_data$County == county,c((100+week+1):151)],
+                  Illinois_2018[Illinois_2018$County == county,c(152,153:(153+week))],
+                  temp_data[temp_data$County == county,c((153+week+1):204)],
+                  Illinois_2018[Illinois_2018$County == county,c(205:(205+week))], 
+                  temp_data[temp_data$County == county,c((205+week+1):256)],
+                  Illinois_2018[Illinois_2018$County == county,c(257,258:(258+(week+1)*11 - 1))],
+                  temp_data[temp_data$County == county,c((258+(week+1)*11):697)])
+        }
+        
+#        data_county[c, c(1:99,100:(100+week))] = Illinois_2017[Illinois_2017$County == county,c(1:99,100:(100+week))]
+#        data_county[c, c((100+week+1):151)] = temp_data[temp_data$County == county,c((100+week+1):151)]
+#        data_county[c, c(152,153:(153+week))] = Illinois_2017[Illinois_2017$County == county,c(152,153:(153+week))]
+#        data_county[c, c((153+week+1):204)] = temp_data[temp_data$County == county,c((153+week+1):204)]
+#        data_county[c, c(205:(205+week))] = Illinois_2017[Illinois_2017$County == county,c(205:(205+week))]
+#        data_county[c, c((205+week+1):256)] = temp_data[temp_data$County == county,c((205+week+1):256)]
+#       data_county[c, c(257,258:(258+(week+1)*11 - 1))] = Illinois_2017[Illinois_2017$County == county,c(257,258:(258+(week+1)*11 - 1))]
+#        data_county[c, c((258+(week+1)*11):697)] = temp_data[Illinois_2017$County == county,c((258+(week+1)*11):697)]
+      } else {
+        a = Illinois_2018[Illinois_2018$County == county,]
+      }
+      data_county = rbind(data_county,a)
+    }
+    yhat0 <- predict(model_rbf, newdata=  data_county[,c(rbf_variables$V1)])
+    predictions_ILLINOIS_2018[year,week + 1] = sum(yhat0)/length(yhat0)
+    year = year + 1
+  }
+  week = week + 1
+}
+
+acre_value = sum(Illinois_2018$Acre.Value)
+real_Yield = matrix(0,40,2)
+max_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  max_value = max(predictions_ILLINOIS_2018[,i])
+  max_predicts[i,1] = max_value
+  max_predicts[i,2] = i
+  real_Yield[i,1] = sum(Illinois_2018$Value)/length(yhat0)
+  real_Yield[i,2] = i
+}
+
+min_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  min_value = min(predictions_ILLINOIS_2018[,i])
+  min_predicts[i,1] = min_value
+  min_predicts[i,2] = i
+}
+
+median_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  min_value = median(predictions_ILLINOIS_2018[,i])
+  median_predicts[i,1] = min_value
+  median_predicts[i,2] = i
+}
+
+
+plot(x = max_predicts[,2], y = max_predicts[,1],ylim = c(0,300),lty =2,col='red',type= 'l', ylab = "Yield",xlab = "week", main = "ILLINOIS 2018")
+lines(x = min_predicts[,2],y=min_predicts[,1],lty =2,col='red')
+lines(x = median_predicts[,2], y = median_predicts[,1], lty =1, col='red')
+lines(x = real_Yield[,2], y = real_Yield[,1], lty =1, col='blue')
+```
+
+```{r warning=FALSE}
+yhat_Illinois_2018_RFE250 = predict(model_rbf, newdata=  Illinois_2018[,c(rbf_variables$V1)])
+res = Illinois_2018$Value - yhat_Illinois_2018_RFE250
+
+Illinois_2018_RFE250_RMSE = sqrt(sum(res^2)/length(res))
+Illinois_2018_RFE250_RRMSE = Illinois_2018_RFE250_RMSE/mean(Illinois_2018$Value)
+print(c(Illinois_2018_RFE250_RMSE, Illinois_2018_RFE250_RRMSE))
+
+RRMSE_for_county_Illinois_2018_RFE250 = sqrt(res^2)/Illinois_2018$Value
+write.table(RRMSE_for_county_Illinois_2018_RFE250, "/Users/akaike/Documents/fall22/STAT615/final pj/RRMSE_RBF250_ALLDATA/RRMSE_for_county_Illinois_2018_RFE250.txt", append = FALSE, sep = " ", dec = ".",
+            row.names = TRUE, col.names = TRUE)
+```
+
+\subsection{2018 IOWA RFE 250 variables}
+```{r warning=FALSE}
+#2018_predictions_IOWA_RFE 250 variables
+predictions_IOWA_2018 = matrix(0,28,40)
+IOWA_2018 = data_2018[data_2018$State=="IOWA",]
+data_IOWA = data_normalized2[data_normalized2$State == "IOWA",]
+week = 0
+for (i in 13:52) {
+  year = 1
+  for (j in 1990:2017) {
+    data_county = data_IOWA[data_IOWA$Year == 2019,]
+    for (county in IOWA_2018$County) {
+      temp_data = data_IOWA[data_IOWA$Year == j,]
+      if (county %in% temp_data$County) {
+        if (week == 0) {
+          a = cbind(IOWA_2018[IOWA_2018$County == county,c(1:99,100)],
+          temp_data[temp_data$County == county,c((100+week+1):151)],
+          IOWA_2018[IOWA_2018$County == county,c(152,153:(153+week))],
+          temp_data[temp_data$County == county,c((153+week+1):203)],
+          IOWA_2018[IOWA_2018$County == county,c(204:205+week)],
+          temp_data[temp_data$County == county,c((205+week+1):256)],
+          IOWA_2018[IOWA_2018$County == county,c(257,258:(258+(week+1)*11 - 1))],
+          temp_data[temp_data$County == county,c((258+(week+1)*11):697)])
+        } else if (week == 39) {
+          a = IOWA_2018[IOWA_2018$County == county,]
+        } else {
+                  a = cbind(IOWA_2018[IOWA_2018$County == county,c(1:99,100:(100+week))],
+                  temp_data[temp_data$County == county,c((100+week+1):151)],
+                  IOWA_2018[IOWA_2018$County == county,c(152,153:(153+week))],
+                  temp_data[temp_data$County == county,c((153+week+1):204)],
+                  IOWA_2018[IOWA_2018$County == county,c(205:(205+week))], 
+                  temp_data[temp_data$County == county,c((205+week+1):256)],
+                  IOWA_2018[IOWA_2018$County == county,c(257,258:(258+(week+1)*11 - 1))],
+                  temp_data[temp_data$County == county,c((258+(week+1)*11):697)])
+        }
+        
+#        data_county[c, c(1:99,100:(100+week))] = Illinois_2017[Illinois_2017$County == county,c(1:99,100:(100+week))]
+#        data_county[c, c((100+week+1):151)] = temp_data[temp_data$County == county,c((100+week+1):151)]
+#        data_county[c, c(152,153:(153+week))] = Illinois_2017[Illinois_2017$County == county,c(152,153:(153+week))]
+#        data_county[c, c((153+week+1):204)] = temp_data[temp_data$County == county,c((153+week+1):204)]
+#        data_county[c, c(205:(205+week))] = Illinois_2017[Illinois_2017$County == county,c(205:(205+week))]
+#        data_county[c, c((205+week+1):256)] = temp_data[temp_data$County == county,c((205+week+1):256)]
+#       data_county[c, c(257,258:(258+(week+1)*11 - 1))] = Illinois_2017[Illinois_2017$County == county,c(257,258:(258+(week+1)*11 - 1))]
+#        data_county[c, c((258+(week+1)*11):697)] = temp_data[Illinois_2017$County == county,c((258+(week+1)*11):697)]
+      } else {
+        a = IOWA_2018[IOWA_2018$County == county,]
+      }
+      data_county = rbind(data_county,a)
+    }
+    yhat0 <- predict(model_rbf,  newdata=  data_county[,c(rbf_variables$V1)])
+    predictions_IOWA_2018[year,week + 1] = sum(yhat0)/length(yhat0)
+    year = year + 1
+  }
+  week = week + 1
+}
+
+acre_value = sum(IOWA_2018$Acre.Value)
+real_Yield = matrix(0,40,2)
+max_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  max_value = max(predictions_IOWA_2018[,i])
+  max_predicts[i,1] = max_value
+  max_predicts[i,2] = i
+  real_Yield[i,1] = sum(IOWA_2018$Value)/length(yhat0)
+  real_Yield[i,2] = i
+}
+
+min_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  min_value = min(predictions_IOWA_2018[,i])
+  min_predicts[i,1] = min_value
+  min_predicts[i,2] = i
+}
+
+median_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  min_value = median(predictions_IOWA_2018[,i])
+  median_predicts[i,1] = min_value
+  median_predicts[i,2] = i
+}
+
+
+plot(x = max_predicts[,2], y = max_predicts[,1],ylim = c(0,300),lty =2,col='red',type= 'l', ylab = "Yield",xlab = "week", main = "IOWA 2018")
+lines(x = min_predicts[,2],y=min_predicts[,1],lty =2,col='red')
+lines(x = median_predicts[,2], y = median_predicts[,1], lty =1, col='red')
+lines(x = real_Yield[,2], y = real_Yield[,1], lty =1, col='blue')
+```
+
+```{r warning=FALSE}
+yhat_IOWA_2018_RFE250 = predict(model_rbf,  newdata=  IOWA_2018[,c(rbf_variables$V1)])
+res = IOWA_2018$Value - yhat_IOWA_2018_RFE250
+
+IOWA_2018_RFE250_RMSE = sqrt(sum(res^2)/length(res))
+IOWA_2018_RFE250_RRMSE = IOWA_2018_RFE250_RMSE/mean(IOWA_2018$Value)
+print(c(IOWA_2018_RFE250_RMSE, IOWA_2018_RFE250_RRMSE))
+
+RRMSE_for_county_IOWA_2018_RFE250 = sqrt(res^2)/IOWA_2018$Value
+write.table(RRMSE_for_county_IOWA_2018_RFE250, "/Users/akaike/Documents/fall22/STAT615/final pj/RRMSE_RBF250_ALLDATA/RRMSE_for_county_IOWA_2018_RFE250.txt", append = FALSE, sep = " ", dec = ".",
+            row.names = TRUE, col.names = TRUE)
+```
+
+\subsection{2018 INDIANA RFE 250 variables}
+```{r warning=FALSE}
+#2018_predictions_INDIANA_RFE 250 variables
+predictions_INDIANA_2018 = matrix(0,28,40)
+INDIANA_2018 = data_2018[data_2018$State=="INDIANA",]
+data_INDIANA = data_normalized2[data_normalized2$State == "INDIANA",]
+week = 0
+for (i in 13:52) {
+  year = 1
+  for (j in 1990:2017) {
+    data_county = data_INDIANA[data_INDIANA$Year == 2019,]
+    for (county in INDIANA_2018$County) {
+      temp_data = data_INDIANA[data_INDIANA$Year == j,]
+      if (county %in% temp_data$County) {
+        if (week == 0) {
+          a = cbind(INDIANA_2018[INDIANA_2018$County == county,c(1:99,100)],
+          temp_data[temp_data$County == county,c((100+week+1):151)],
+          INDIANA_2018[INDIANA_2018$County == county,c(152,153:(153+week))],
+          temp_data[temp_data$County == county,c((153+week+1):203)],
+          INDIANA_2018[INDIANA_2018$County == county,c(204:205+week)],
+          temp_data[temp_data$County == county,c((205+week+1):256)],
+          INDIANA_2018[INDIANA_2018$County == county,c(257,258:(258+(week+1)*11 - 1))],
+          temp_data[temp_data$County == county,c((258+(week+1)*11):697)])
+        } else if (week == 39) {
+          a = INDIANA_2018[INDIANA_2018$County == county,]
+        } else {
+                  a = cbind(INDIANA_2018[INDIANA_2018$County == county,c(1:99,100:(100+week))],
+                  temp_data[temp_data$County == county,c((100+week+1):151)],
+                  INDIANA_2018[INDIANA_2018$County == county,c(152,153:(153+week))],
+                  temp_data[temp_data$County == county,c((153+week+1):204)],
+                  INDIANA_2018[INDIANA_2018$County == county,c(205:(205+week))], 
+                  temp_data[temp_data$County == county,c((205+week+1):256)],
+                  INDIANA_2018[INDIANA_2018$County == county,c(257,258:(258+(week+1)*11 - 1))],
+                  temp_data[temp_data$County == county,c((258+(week+1)*11):697)])
+        }
+        
+#        data_county[c, c(1:99,100:(100+week))] = Illinois_2017[Illinois_2017$County == county,c(1:99,100:(100+week))]
+#        data_county[c, c((100+week+1):151)] = temp_data[temp_data$County == county,c((100+week+1):151)]
+#        data_county[c, c(152,153:(153+week))] = Illinois_2017[Illinois_2017$County == county,c(152,153:(153+week))]
+#        data_county[c, c((153+week+1):204)] = temp_data[temp_data$County == county,c((153+week+1):204)]
+#        data_county[c, c(205:(205+week))] = Illinois_2017[Illinois_2017$County == county,c(205:(205+week))]
+#        data_county[c, c((205+week+1):256)] = temp_data[temp_data$County == county,c((205+week+1):256)]
+#       data_county[c, c(257,258:(258+(week+1)*11 - 1))] = Illinois_2017[Illinois_2017$County == county,c(257,258:(258+(week+1)*11 - 1))]
+#        data_county[c, c((258+(week+1)*11):697)] = temp_data[Illinois_2017$County == county,c((258+(week+1)*11):697)]
+      } else {
+        a = INDIANA_2018[INDIANA_2018$County == county,]
+      }
+      data_county = rbind(data_county,a)
+    }
+    yhat0 <- predict(model_rbf, newdata=  data_county[,c(rbf_variables$V1)])
+    predictions_INDIANA_2018[year,week + 1] = sum(yhat0)/length(yhat0)
+    year = year + 1
+  }
+  week = week + 1
+}
+
+acre_value = sum(INDIANA_2018$Acre.Value)
+real_Yield = matrix(0,40,2)
+max_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  max_value = max(predictions_INDIANA_2018[,i])
+  max_predicts[i,1] = max_value
+  max_predicts[i,2] = i
+  real_Yield[i,1] = sum(INDIANA_2018$Value)/length(yhat0)
+  real_Yield[i,2] = i
+}
+
+min_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  min_value = min(predictions_INDIANA_2018[,i])
+  min_predicts[i,1] = min_value
+  min_predicts[i,2] = i
+}
+
+median_predicts = matrix(0,40,2)
+for (i in 1:40) {
+  min_value = median(predictions_INDIANA_2018[,i])
+  median_predicts[i,1] = min_value
+  median_predicts[i,2] = i
+}
+
+plot(x = max_predicts[,2], y = max_predicts[,1],ylim = c(0,300),lty =2,col='red',type= 'l', ylab = "Yield",xlab = "week", main = "INDIANA 2018")
+lines(x = min_predicts[,2],y=min_predicts[,1],lty =2,col='red')
+lines(x = median_predicts[,2], y = median_predicts[,1], lty =1, col='red')
+lines(x = real_Yield[,2], y = real_Yield[,1], lty =1, col='blue')
+```
+
+```{r warning=FALSE}
+yhat_INDIANA_2018_RFE250 = predict(model_rbf, newdata=  INDIANA_2018[,c(rbf_variables$V1)])
+res = INDIANA_2018$Value - yhat_INDIANA_2018_RFE250
+
+INDIANA_2018_RFE250_RMSE = sqrt(sum(res^2)/length(res))
+INDIANA_2018_RFE250_RRMSE = INDIANA_2018_RFE250_RMSE/mean(INDIANA_2018$Value)
+print(c(INDIANA_2018_RFE250_RMSE, INDIANA_2018_RFE250_RRMSE))
+
+RRMSE_for_county_INDIANA_2018_RFE250 = sqrt(res^2)/INDIANA_2018$Value
+write.table(RRMSE_for_county_INDIANA_2018_RFE250, "/Users/akaike/Documents/fall22/STAT615/final pj/RRMSE_for_county_INDIANA_2018_RFE250.txt", append = FALSE, sep = " ", dec = ".",
+            row.names = TRUE, col.names = TRUE)
+```
